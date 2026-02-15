@@ -113,3 +113,31 @@ export const createShipment = async (req, res) => {
     res.status(500).json({ message: "server error" });
   }
 };
+
+export const getShipments = async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const pageSize = Number(req.query.pageSize) || 20;
+
+    const skip = (page - 1) * pageSize;
+
+    const [data, count] = await Promise.all([
+      Shipment.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      Shipment.countDocuments(),
+    ]);
+
+    res.json({
+      success: true,
+      data,
+      count,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "server error" });
+  }
+};
+
