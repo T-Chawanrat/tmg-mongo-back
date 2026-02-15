@@ -122,11 +122,7 @@ export const getShipments = async (req, res) => {
     const skip = (page - 1) * pageSize;
 
     const [data, count] = await Promise.all([
-      Shipment.find()
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(pageSize)
-        .lean(),
+      Shipment.find().sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
       Shipment.countDocuments(),
     ]);
 
@@ -141,3 +137,16 @@ export const getShipments = async (req, res) => {
   }
 };
 
+export const getDupShipments = async (req, res) => {
+  try {
+    const data = await DupShipment.find().sort({ createdAt: -1 }).lean();
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "server error" });
+  }
+};

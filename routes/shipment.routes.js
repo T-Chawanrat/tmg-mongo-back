@@ -1,9 +1,10 @@
 import express from "express";
-import { createShipment , getShipments } from "../controllers/shipment.controller.js";
+import { createShipment , getShipments , getDupShipments } from "../controllers/shipment.controller.js";
 
 const router = express.Router();
 
-router.get("/", getShipments);
-router.post("/shipments", createShipment);
+router.get("/getadv", getShipments);
+router.get("/dup", getDupShipments);
+router.post("/shipments", createShipment)
 
 export default router;
