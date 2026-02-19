@@ -1,7 +1,7 @@
 import Shipment from "../models/Shipment.js";
 import DupShipment from "../models/DupShipment.js";
 import MasterWarehouse from "../models/MasterWarehouse.js";
-import Quotation from "../models/Quotation.js";
+import QuotationAdv from "../models/QuotationAdv.js";
 import { generateBillNo } from "../utils/generateBillNo.js";
 
 // export const createShipment = async (req, res) => {
@@ -129,11 +129,20 @@ export const createShipment = async (req, res) => {
     /* -----------------------------
        🔹 รวม serial ทั้งหมด
     ----------------------------- */
-    const allSerials =
-      body.detail.flatMap((d) => d.serialNo || []) || [];
+    const allSerials = body.detail.flatMap((d) => d.serialNo || []) || [];
 
     if (allSerials.length === 0) {
       return res.status(400).json({ message: "serialNo not found" });
+    }
+
+    // 🔹 กัน serial ซ้ำใน request เดียวกัน
+    const uniqueSerials = [...new Set(allSerials)];
+
+    if (uniqueSerials.length !== allSerials.length) {
+      return res.status(400).json({
+        success: false,
+        message: "พบ serial ซ้ำภายใน request เดียวกัน",
+      });
     }
 
     /* -----------------------------
@@ -204,7 +213,7 @@ export const createShipment = async (req, res) => {
     ----------------------------- */
     const packageIds = body.detail.map((d) => d.packageId);
 
-    const quotations = await Quotation.find({
+    const quotations = await QuotationAdv.find({
       package_id: { $in: packageIds },
     }).lean();
 
@@ -222,9 +231,7 @@ export const createShipment = async (req, res) => {
     let totalPrice = 0;
 
     for (const item of body.detail) {
-      const quotation = quotations.find(
-        (q) => q.package_id === item.packageId
-      );
+      const quotation = quotations.find((q) => q.package_id === item.packageId);
 
       if (!quotation) {
         return res.status(400).json({
@@ -240,7 +247,7 @@ export const createShipment = async (req, res) => {
         serialNos: item.serialNo || [],
       });
 
-      totalPrice += quotation.package_price;
+      totalPrice += quotation.package_price * (item.serialNo?.length || 0);
     }
 
     /* -----------------------------
@@ -269,7 +276,6 @@ export const createShipment = async (req, res) => {
     return res.status(500).json({ message: "server error" });
   }
 };
-
 
 export const getShipments = async (req, res) => {
   try {

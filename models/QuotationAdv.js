@@ -18,9 +18,9 @@ const QuotationSchema = new mongoose.Schema(
     package_price: Number,
   },
   {
-    collection: "quotations",
+    collection: "quotations_adv",
     timestamps: false,
   },
 );
 
-export default mongoose.model("Quotation", QuotationSchema);
+export default mongoose.model("QuotationAdv", QuotationSchema);
