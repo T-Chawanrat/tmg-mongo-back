@@ -18,7 +18,7 @@ const QuotationSchema = new mongoose.Schema(
     package_price: Number,
   },
   {
-    collection: "quotations_adv",
+    collection: "quotations",
     timestamps: false,
   },
 );

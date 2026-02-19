@@ -4,6 +4,116 @@ import MasterWarehouse from "../models/MasterWarehouse.js";
 import Quotation from "../models/Quotation.js";
 import { generateBillNo } from "../utils/generateBillNo.js";
 
+// export const createShipment = async (req, res) => {
+//   try {
+//     const body = req.body;
+
+//     if (!body.sendId) {
+//       return res.status(400).json({ message: "sendId is required" });
+//     }
+
+//     const serialNos = body.detail?.flatMap((d) => d.serialNo || []) || [];
+
+//     if (serialNos.length === 0) {
+//       return res.status(400).json({ message: "serialNo not found" });
+//     }
+
+//     const subdistrict = body.head?.subdistrict;
+//     const district = body.head?.district;
+//     const province = body.head?.province;
+
+//     const matchedWarehouse = await MasterWarehouse.findOne({
+//       sub_district_name_th: subdistrict,
+//       district_name_th: district,
+//       province_name_th: province,
+//     }).lean();
+
+//     if (!matchedWarehouse) {
+//       await DupShipment.create({
+//         sendId: body.sendId,
+//         payload: body,
+//         serialNos,
+//         reason: "invalid address",
+//         status: "INVALID_ADDRESS",
+//       });
+
+//       return res.status(409).json({
+//         success: false,
+//         message: "ที่อยู่ไม่ถูกต้อง",
+//         serialNos,
+//       });
+//     }
+
+//     const existedShipment = await Shipment.findOne({
+//       serialNos: { $in: serialNos },
+//     }).lean();
+
+//     const existedDup = await DupShipment.findOne({
+//       serialNos: { $in: serialNos },
+//       status: "DUP_SN",
+//     }).lean();
+
+//     if (existedShipment || existedDup) {
+//       await DupShipment.create({
+//         sendId: body.sendId,
+//         payload: body,
+//         serialNos,
+//         reason: "serial duplicated",
+//         status: "DUP_SN",
+//       });
+
+//       return res.status(409).json({
+//         success: false,
+//         message: "พบ serial ซ้ำ",
+//         serialNos,
+//       });
+//     }
+
+//     /* ----------------------------------------
+//        ✅ ตรงนี้ค่อย generate bill
+//     ---------------------------------------- */
+
+//     const customerCode = "ADV0001"; // ชั่วคราว
+//     const billNo = await generateBillNo(customerCode);
+
+//     const firstDetail = body.detail[0];
+//     const packageId = firstDetail.packageId;
+
+//     const quotation = await Quotation.findOne({
+//       package_id: packageId,
+//     }).lean();
+
+//     if (!quotation) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "ไม่พบ package ใน quotations",
+//       });
+//     }
+
+//     const doc = await Shipment.create({
+//       bill_no: billNo,
+//       sendId: body.sendId,
+//       payload: body,
+//       serialNos,
+
+//       sub_district_id: matchedWarehouse.sub_district_id,
+//       warehouse: matchedWarehouse.warehouse_name,
+
+//       package_name: quotation.package_name,
+//       package_price: quotation.package_price,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       bill_no: billNo,
+//       id: doc._id,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "server error" });
+//   }
+// };
+
 export const createShipment = async (req, res) => {
   try {
     const body = req.body;
@@ -12,12 +122,23 @@ export const createShipment = async (req, res) => {
       return res.status(400).json({ message: "sendId is required" });
     }
 
-    const serialNos = body.detail?.flatMap((d) => d.serialNo || []) || [];
+    if (!Array.isArray(body.detail) || body.detail.length === 0) {
+      return res.status(400).json({ message: "detail is required" });
+    }
 
-    if (serialNos.length === 0) {
+    /* -----------------------------
+       🔹 รวม serial ทั้งหมด
+    ----------------------------- */
+    const allSerials =
+      body.detail.flatMap((d) => d.serialNo || []) || [];
+
+    if (allSerials.length === 0) {
       return res.status(400).json({ message: "serialNo not found" });
     }
 
+    /* -----------------------------
+       🔹 ตรวจที่อยู่
+    ----------------------------- */
     const subdistrict = body.head?.subdistrict;
     const district = body.head?.district;
     const province = body.head?.province;
@@ -32,7 +153,7 @@ export const createShipment = async (req, res) => {
       await DupShipment.create({
         sendId: body.sendId,
         payload: body,
-        serialNos,
+        serialNos: allSerials,
         reason: "invalid address",
         status: "INVALID_ADDRESS",
       });
@@ -40,16 +161,19 @@ export const createShipment = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "ที่อยู่ไม่ถูกต้อง",
-        serialNos,
+        serialNos: allSerials,
       });
     }
 
+    /* -----------------------------
+       🔹 เช็ค serial ซ้ำ (แก้ตรงนี้สำคัญ)
+    ----------------------------- */
     const existedShipment = await Shipment.findOne({
-      serialNos: { $in: serialNos },
+      "packages.serialNos": { $in: allSerials },
     }).lean();
 
     const existedDup = await DupShipment.findOne({
-      serialNos: { $in: serialNos },
+      serialNos: { $in: allSerials },
       status: "DUP_SN",
     }).lean();
 
@@ -57,7 +181,7 @@ export const createShipment = async (req, res) => {
       await DupShipment.create({
         sendId: body.sendId,
         payload: body,
-        serialNos,
+        serialNos: allSerials,
         reason: "serial duplicated",
         status: "DUP_SN",
       });
@@ -65,54 +189,87 @@ export const createShipment = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "พบ serial ซ้ำ",
-        serialNos,
+        serialNos: allSerials,
       });
     }
 
-    /* ----------------------------------------
-       ✅ ตรงนี้ค่อย generate bill
-    ---------------------------------------- */
-
-    const customerCode = "ADV0001"; // ชั่วคราว
+    /* -----------------------------
+       🔹 Generate Bill
+    ----------------------------- */
+    const customerCode = "ADV0001";
     const billNo = await generateBillNo(customerCode);
 
-    const firstDetail = body.detail[0];
-    const packageId = firstDetail.packageId;
+    /* -----------------------------
+       🔹 ดึง quotations ทั้งหมดทีเดียว
+    ----------------------------- */
+    const packageIds = body.detail.map((d) => d.packageId);
 
-    const quotation = await Quotation.findOne({
-      package_id: packageId,
+    const quotations = await Quotation.find({
+      package_id: { $in: packageIds },
     }).lean();
 
-    if (!quotation) {
+    if (quotations.length !== packageIds.length) {
       return res.status(400).json({
         success: false,
-        message: "ไม่พบ package ใน quotations",
+        message: "มี package บางรายการไม่พบใน quotations",
       });
     }
 
+    /* -----------------------------
+       🔹 Map packages
+    ----------------------------- */
+    const packages = [];
+    let totalPrice = 0;
+
+    for (const item of body.detail) {
+      const quotation = quotations.find(
+        (q) => q.package_id === item.packageId
+      );
+
+      if (!quotation) {
+        return res.status(400).json({
+          success: false,
+          message: `ไม่พบ package ${item.packageId}`,
+        });
+      }
+
+      packages.push({
+        package_id: quotation.package_id,
+        package_name: quotation.package_name,
+        package_price: quotation.package_price,
+        serialNos: item.serialNo || [],
+      });
+
+      totalPrice += quotation.package_price;
+    }
+
+    /* -----------------------------
+       🔹 Create Shipment
+    ----------------------------- */
     const doc = await Shipment.create({
       bill_no: billNo,
       sendId: body.sendId,
       payload: body,
-      serialNos,
+
+      packages,
+      total_price: totalPrice,
 
       sub_district_id: matchedWarehouse.sub_district_id,
       warehouse: matchedWarehouse.warehouse_name,
-
-      package_name: quotation.package_name,
-      package_price: quotation.package_price,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       bill_no: billNo,
+      total_price: totalPrice,
       id: doc._id,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "server error" });
+    return res.status(500).json({ message: "server error" });
   }
 };
+
 
 export const getShipments = async (req, res) => {
   try {
