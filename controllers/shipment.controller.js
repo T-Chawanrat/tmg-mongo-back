@@ -1,6 +1,7 @@
 import Shipment from "../models/Shipment.js";
 import DupShipment from "../models/DupShipment.js";
 import MasterWarehouse from "../models/MasterWarehouse.js";
+import MasterProductStatus from "../models/MasterProductStatus.js";
 import QuotationAdv from "../models/QuotationAdv.js";
 import { generateBillNo } from "../utils/generateBillNo.js";
 
@@ -229,6 +230,8 @@ export const createShipment = async (req, res) => {
     ----------------------------- */
     const packages = [];
     let totalPrice = 0;
+    let groupId = null;
+    let groupBill = null;
 
     for (const item of body.detail) {
       const quotation = quotations.find((q) => q.package_id === item.packageId);
@@ -239,6 +242,8 @@ export const createShipment = async (req, res) => {
           message: `ไม่พบ package ${item.packageId}`,
         });
       }
+      groupId = quotation.group_id;
+      groupBill = quotation.group_bill;
 
       packages.push({
         package_id: quotation.package_id,
@@ -250,6 +255,16 @@ export const createShipment = async (req, res) => {
       totalPrice += quotation.package_price * (item.serialNo?.length || 0);
     }
 
+    const defaultStatus = await MasterProductStatus.findOne({
+      status_code: 1,
+    }).lean();
+
+    if (!defaultStatus) {
+      return res.status(500).json({
+        success: false,
+        message: "ไม่พบ master status",
+      });
+    }
     /* -----------------------------
        🔹 Create Shipment
     ----------------------------- */
@@ -257,6 +272,12 @@ export const createShipment = async (req, res) => {
       bill_no: billNo,
       sendId: body.sendId,
       payload: body,
+
+      status_code: defaultStatus.status_code,
+      status_name: defaultStatus.status_name,
+
+      group_id: groupId,
+      group_bill: groupBill,
 
       packages,
       total_price: totalPrice,

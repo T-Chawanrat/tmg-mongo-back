@@ -50,7 +50,6 @@
 
 // export default mongoose.model("Shipment", ShipmentSchema);
 
-
 import mongoose from "mongoose";
 
 const ShipmentSchema = new mongoose.Schema(
@@ -66,12 +65,33 @@ const ShipmentSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ เพิ่มสถานะ
+    status_code: {
+      type: Number,
+      index: true,
+      default: 1, // เช่น เริ่มต้น = รับเข้าระบบ
+    },
+
+    status_name: {
+      type: String,
+    },
+
+    // ✅ เพิ่มกลุ่ม
+    group_id: {
+      type: Number,
+      index: true,
+    },
+
+    group_bill: {
+      type: String,
+      index: true,
+    },
+
     payload: {
       type: mongoose.Schema.Types.Mixed,
       required: true,
     },
 
-    // ✅ เปลี่ยนจาก serialNos เดิม มาเป็น packages
     packages: [
       {
         package_id: {
@@ -112,7 +132,7 @@ const ShipmentSchema = new mongoose.Schema(
   {
     timestamps: true,
     collection: "shipments",
-  }
+  },
 );
 
 export default mongoose.model("Shipment", ShipmentSchema);

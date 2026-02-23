@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 
 const QuotationSchema = new mongoose.Schema(
   {
-    customer_id: { type: String, index: true },
-    customer_name: String,
+    group_id: { type: Number, index: true },
+    group_bill: { type: String, index: true },
 
     width: Number,
     length: Number,
